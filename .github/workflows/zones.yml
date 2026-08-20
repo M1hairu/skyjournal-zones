@@ -1,0 +1,84 @@
+# Зоны из АИП собираются здесь, а не на компьютере пилота.
+#
+# Раз в неделю GitHub качает раздел ENR 5.1 с сайта ЦАИ, прогоняет его через
+# tools/aip_zones.py и кладёт готовый файл в публичный gist. Приложение
+# качает оттуда пятьсот килобайт вместо восьмимегабайтного PDF, а компьютер
+# при этом может быть выключен.
+#
+# Почему не разбирать PDF прямо на телефоне: разбор держится на колоночной
+# раскладке `pdftotext -layout`, и ломается он от смены вёрстки молча.
+# На сервере это видно — шаг «сверить с прошлым разом» роняет сборку,
+# и файл не уезжает. В кабине такое не увидеть.
+name: Зоны из АИП
+
+on:
+  schedule:
+    # По средам в 03:00 UTC. АИРАК меняется по четвергам раз в 28 дней,
+    # так что к четвергу свежий файл уже лежит.
+    - cron: "0 3 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Поставить pdftotext
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
+      - name: Собрать зоны
+        run: |
+          python3 aip_zones.py --out zones-russia-aip.txt 2>&1 | tee build.log
+          echo "---"
+          head -30 zones-russia-aip.txt
+
+      - name: Проверить, что вышло не хуже прежнего
+        run: |
+          # Числа берутся из самого файла, а не из лога: лог можно
+          # напечатать, а файл — это то, что уедет пилоту.
+          zones=$(grep -c '^AN ' zones-russia-aip.txt)
+          unknown=$(grep -c '^AH неизвестно' zones-russia-aip.txt || true)
+          echo "зон $zones, без потолка $unknown"
+
+          # Пороги — не круглые числа, а то, что уже проверено руками
+          # 20 августа 2026: 2659 зон, ни одной без потолка.
+          # Если разбор сломается о новую вёрстку, счёт просядет,
+          # и файл никуда не уедет.
+          if [ "$zones" -lt 2400 ]; then
+            echo "::error::зон всего $zones — разбор сломался, файл не публикуем"
+            exit 1
+          fi
+          if [ "$unknown" -gt 50 ]; then
+            echo "::error::у $unknown зон нет верхней границы — разбор высот сломался"
+            exit 1
+          fi
+          # Зона без единой точки — признак того, что контуры не разобрались.
+          if ! grep -q '^DP ' zones-russia-aip.txt; then
+            echo "::error::в файле нет ни одной точки контура"
+            exit 1
+          fi
+
+      - name: Обновить gist
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: bff354241f7b6318c30b8973928958c4
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::нет секрета GIST_TOKEN — файл собран, но не опубликован"
+            exit 0
+          fi
+          gh gist edit "$GIST_ID" -f zones-russia-aip.txt zones-russia-aip.txt
+          echo "опубликовано: https://gist.githubusercontent.com/M1hairu/$GIST_ID/raw/zones-russia-aip.txt"
+
+      - name: Сохранить файл и лог сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: zones
+          path: |
+            zones-russia-aip.txt
+            build.log
+          retention-days: 90

@@ -34,6 +34,19 @@ jobs:
       - name: Поставить pdftotext
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
 
+      - name: Разложить линию государственной границы
+        run: |
+          # Без неё у двадцати пяти приграничных зон край срезается прямой.
+          # У URR553 под Астраханью это стоит шести с половиной тысяч
+          # квадратных километров запретной зоны, которых на карте нет.
+          #
+          # Линия лежит в репозитории сжатой, а не качается из OpenStreetMap
+          # каждый раз: запрос к Overpass отдаёт двенадцать мегабайт, идёт
+          # минутами и часто не отвечает вовсе. Граница страны меняется реже,
+          # чем раз в неделю, — обновлять её сборкой смысла нет.
+          gunzip -c border-chains.json.gz > /tmp/border-chains.json
+          ls -la /tmp/border-chains.json
+
       - name: Собрать зоны
         run: |
           python3 aip_zones.py --out zones-russia-aip.txt 2>&1 | tee build.log

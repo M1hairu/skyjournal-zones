@@ -68,16 +68,21 @@ jobs:
 
       - name: Положить файл в репозиторий
         run: |
-          # Коммит только если файл действительно изменился: АИРАК меняется
-          # раз в 28 дней, а сборка идёт еженедельно — три раза из четырёх
-          # тут менять нечего, и пустые коммиты только засоряют историю.
-          if git diff --quiet -- zones-russia-aip.txt; then
-            echo "файл не изменился — ничего не публикуем"
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add zones-russia-aip.txt
+
+          # Коммит только если файл действительно изменился: АИРАК меняется
+          # раз в 28 дней, а сборка идёт еженедельно — три раза из четырёх
+          # тут менять нечего, и пустые коммиты только засоряют историю.
+          #
+          # Сравнение идёт по индексу, а не по рабочему дереву: `git diff`
+          # новых файлов не видит вовсе и на первом же запуске сказал бы
+          # «не изменился» о файле, которого в репозитории ещё нет.
+          if git diff --cached --quiet; then
+            echo "файл не изменился — ничего не публикуем"
+            exit 0
+          fi
           git commit -m "Зоны из АИП: $(grep -c '^AN ' zones-russia-aip.txt) зон, $(grep -m1 'Дата АИП' zones-russia-aip.txt | cut -d: -f2-)"
           git push
           echo "опубликовано: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/zones-russia-aip.txt"

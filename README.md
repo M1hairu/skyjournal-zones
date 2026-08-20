@@ -5,7 +5,7 @@
 для амфибии.
 
 **Готовый файл:**
-[zones-russia-aip.txt](https://gist.githubusercontent.com/M1hairu/bff354241f7b6318c30b8973928958c4/raw/zones-russia-aip.txt)
+[zones-russia-aip.txt](https://raw.githubusercontent.com/M1hairu/skyjournal-zones/main/zones-russia-aip.txt)
 · 2659 зон · формат OpenAir · обновляется раз в неделю
 
 ## Откуда данные

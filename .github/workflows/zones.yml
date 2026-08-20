@@ -19,7 +19,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # Право писать в свой же репозиторий — этого хватает, чтобы положить
+  # собранный файл рядом. Никаких личных токенов заводить не нужно:
+  # gist потребовал бы отдельный ключ с правами на аккаунт, а публичный
+  # репозиторий отдаёт файл по прямой ссылке тем же способом.
+  contents: write
 
 jobs:
   build:
@@ -62,17 +66,21 @@ jobs:
             exit 1
           fi
 
-      - name: Обновить gist
-        env:
-          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
-          GIST_ID: bff354241f7b6318c30b8973928958c4
+      - name: Положить файл в репозиторий
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::warning::нет секрета GIST_TOKEN — файл собран, но не опубликован"
+          # Коммит только если файл действительно изменился: АИРАК меняется
+          # раз в 28 дней, а сборка идёт еженедельно — три раза из четырёх
+          # тут менять нечего, и пустые коммиты только засоряют историю.
+          if git diff --quiet -- zones-russia-aip.txt; then
+            echo "файл не изменился — ничего не публикуем"
             exit 0
           fi
-          gh gist edit "$GIST_ID" -f zones-russia-aip.txt zones-russia-aip.txt
-          echo "опубликовано: https://gist.githubusercontent.com/M1hairu/$GIST_ID/raw/zones-russia-aip.txt"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add zones-russia-aip.txt
+          git commit -m "Зоны из АИП: $(grep -c '^AN ' zones-russia-aip.txt) зон, $(grep -m1 'Дата АИП' zones-russia-aip.txt | cut -d: -f2-)"
+          git push
+          echo "опубликовано: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/zones-russia-aip.txt"
 
       - name: Сохранить файл и лог сборки
         uses: actions/upload-artifact@v4
